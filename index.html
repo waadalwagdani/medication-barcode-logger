@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Medication Barcode Logger</title>
+
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      color: #172033;
+    }
+
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 25px;
+      color: #0f2f4a;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #0f2f4a;
+    }
+
+    .subtitle {
+      margin: 0 0 22px;
+      color: #667085;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .setup-box {
+      background: #fffaf0;
+      border: 1px solid #f5d08a;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+
+    .scanner-box {
+      background: #f3f7f9;
+      border: 1px solid #d8e4e8;
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    video {
+      width: 100%;
+      max-height: 390px;
+      background: #000;
+      border-radius: 16px;
+      display: none;
+      object-fit: cover;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-weight: 700;
+      color: #344054;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      border: 1px solid #cfd6df;
+      border-radius: 16px;
+      font-size: 15px;
+      outline: none;
+      background: white;
+    }
+
+    input {
+      direction: ltr;
+      text-align: left;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+      direction: ltr;
+      text-align: left;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: #0f6372;
+      box-shadow: 0 0 0 4px rgba(15, 99, 114, 0.12);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      background: #0f6372;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #172033;
+    }
+
+    button.light {
+      background: #e8eef2;
+      color: #172033;
+    }
+
+    button.danger {
+      background: #9b1c1c;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.7;
+      margin-top: 10px;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #e8eef2;
+      color: #172033;
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .status-pill.ok {
+      background: #e8f7ef;
+      color: #137a3f;
+    }
+
+    .status-pill.bad {
+      background: #fff1f1;
+      color: #9b1c1c;
+    }
+
+    .result {
+      margin-top: 22px;
+      display: none;
+      border-radius: 18px;
+      padding: 18px;
+      background: #f3fbfc;
+      border: 1px solid #cdebef;
+    }
+
+    .result h2 {
+      margin: 0 0 12px;
+      font-size: 19px;
+      color: #0f6372;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .item {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .key {
+      font-size: 12px;
+      color: #667085;
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-size: 15px;
+      font-weight: 700;
+      color: #172033;
+      direction: ltr;
+      text-align: left;
+      word-break: break-word;
+    }
+
+    .error {
+      display: none;
+      margin-top: 16px;
+      background: #fff1f1;
+      border: 1px solid #ffc9c9;
+      color: #9b1c1c;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+    }
+
+    .success {
+      display: none;
+      margin-top: 16px;
+      background: #eefaf3;
+      border: 1px solid #bde8ce;
+      color: #137a3f;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    @media (min-width: 640px) {
+      .buttons {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Medication Barcode Logger</h1>
+      <p class="subtitle">
+        صوري باركود الدواء أو الصقي النص الناتج منه. الأداة تفك GTIN وSerial وExpiry وBatch، ثم ترسل البيانات تلقائيًا إلى Google Sheet.
+      </p>
+
+      <div id="setupBox" class="setup-box">
+        <h2>إعداد الرابط</h2>
+        <div class="hint">
+          الصقي رابط Google Apps Script Web App الذي ينتهي بـ /exec. هذا يتم مرة واحدة فقط على نفس الجهاز.
+        </div>
+
+        <label for="scriptUrlInput">Apps Script /exec URL</label>
+        <input id="scriptUrlInput" placeholder="https://script.google.com/macros/s/...../exec" />
+
+        <div class="buttons">
+          <button type="button" onclick="saveScriptUrl()">حفظ الرابط</button>
+          <button type="button" class="danger" onclick="clearScriptUrl()">مسح الرابط</button>
+        </div>
+
+        <div id="urlStatus" class="status-pill">لم يتم حفظ الرابط بعد</div>
+      </div>
+
+      <div class="scanner-box">
+        <video id="video" playsinline muted></video>
+
+        <div class="buttons">
+          <button type="button" onclick="startScanner()">فتح الكاميرا</button>
+          <button type="button" class="light" onclick="stopScanner()">إيقاف الكاميرا</button>
+        </div>
+
+        <div class="hint">
+          افتحي هذه الصفحة من Chrome أو Safari كرابط HTTPS مباشر. لا تفتحيها من داخل واتساب أو Gmail.
+        </div>
+      </div>
+
+      <label for="codeInput">كود الباركود</label>
+      <textarea id="codeInput" placeholder="مثال: (01)06285108000136(21)0000051933888(17)270430(10)6101527"></textarea>
+
+      <div class="buttons">
+        <button id="submitBtn" type="button" onclick="submitCode()">حفظ في الشيت</button>
+        <button type="button" class="secondary" onclick="clearForm()">مسح</button>
+      </div>
+
+      <div id="errorBox" class="error"></div>
+      <div id="successBox" class="success"></div>
+
+      <div id="resultBox" class="result">
+        <h2>تمت قراءة البيانات</h2>
+
+        <div class="grid">
+          <div class="item">
+            <div class="key">GTIN</div>
+            <div class="value" id="gtin"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Serial Number</div>
+            <div class="value" id="serial"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Expiry Date</div>
+            <div class="value" id="expiry"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Batch Number</div>
+            <div class="value" id="batch"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Raw Barcode</div>
+            <div class="value" id="raw"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Send Status</div>
+            <div class="value" id="sendStatus"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "medicationBarcodeLoggerScriptUrl";
+
+    let codeReader = null;
+    let isScanning = false;
+
+    window.addEventListener("load", function() {
+      loadScriptUrl();
+    });
+
+    function loadScriptUrl() {
+      const savedUrl = localStorage.getItem(STORAGE_KEY) || "";
+      document.getElementById("scriptUrlInput").value = savedUrl;
+      updateUrlStatus();
+    }
+
+    function getScriptUrl() {
+      return (localStorage.getItem(STORAGE_KEY) || "").trim();
+    }
+
+    function saveScriptUrl() {
+      hideError();
+      hideSuccess();
+
+      const input = document.getElementById("scriptUrlInput").value.trim();
+
+      if (!input) {
+        showError("الصقي رابط Apps Script أولاً.");
+        return;
+      }
+
+      if (!input.startsWith("https://script.google.com/macros/s/") || !input.endsWith("/exec")) {
+        showError("الرابط غير صحيح. لازم يبدأ بـ https://script.google.com/macros/s/ وينتهي بـ /exec");
+        return;
+      }
+
+      localStorage.setItem(STORAGE_KEY, input);
+      updateUrlStatus();
+      showSuccess("تم حفظ رابط الشيت على هذا الجهاز.");
+    }
+
+    function clearScriptUrl() {
+      localStorage.removeItem(STORAGE_KEY);
+      document.getElementById("scriptUrlInput").value = "";
+      updateUrlStatus();
+      showSuccess("تم مسح الرابط المحفوظ.");
+    }
+
+    function updateUrlStatus() {
+      const status = document.getElementById("urlStatus");
+      const savedUrl = getScriptUrl();
+
+      if (savedUrl) {
+        status.textContent = "الرابط محفوظ وجاهز";
+        status.className = "status-pill ok";
+      } else {
+        status.textContent = "لم يتم حفظ الرابط بعد";
+        status.className = "status-pill bad";
+      }
+    }
+
+    function startScanner() {
+      hideError();
+      hideSuccess();
+
+      const scriptUrl = getScriptUrl();
+
+      if (!scriptUrl) {
+        showError("احفظي رابط Apps Script /exec أولاً، ثم افتحي الكاميرا.");
+        return;
+      }
+
+      const video = document.getElementById("video");
+      video.style.display = "block";
+
+      if (!window.ZXing) {
+        showError("مكتبة قارئ الباركود لم تُحمّل. تأكدي من الاتصال بالإنترنت ثم أعيدي فتح الصفحة.");
+        return;
+      }
+
+      stopScanner();
+
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      isScanning = true;
+
+      codeReader
+        .decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          "video",
+          function(result, err) {
+            if (result && isScanning) {
+              const text = result.getText();
+              document.getElementById("codeInput").value = text;
+              stopScanner();
+              submitCode();
+            }
+          }
+        )
+        .catch(function(err) {
+          stopScanner();
+
+          let message = "تعذر فتح الكاميرا: " + err;
+
+          if (String(err).includes("NotAllowedError")) {
+            message =
+              "المتصفح منع الكاميرا. افتحي الصفحة كرابط HTTPS مباشر من Chrome/Safari، ثم من إعدادات الموقع اختاري Camera = Allow.";
+          }
+
+          showError(message);
+        });
+    }
+
+    function stopScanner() {
+      isScanning = false;
+
+      if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+      }
+
+      const video = document.getElementById("video");
+      video.style.display = "none";
+    }
+
+    function submitCode() {
+      const scriptUrl = getScriptUrl();
+      const code = document.getElementById("codeInput").value.trim();
+      const btn = document.getElementById("submitBtn");
+
+      hideError();
+      hideSuccess();
+      hideResult();
+
+      if (!scriptUrl) {
+        showError("احفظي رابط Apps Script /exec أولاً.");
+        return;
+      }
+
+      if (!code) {
+        showError("الرجاء إدخال أو تصوير كود الباركود.");
+        return;
+      }
+
+      const parsed = parseGS1Local(code);
+
+      if (!parsed.gtin) {
+        showError("لم أستطع استخراج GTIN. تأكدي أن الكود يحتوي على (01).");
+        return;
+      }
+
+      document.getElementById("gtin").textContent = parsed.gtin || "";
+      document.getElementById("serial").textContent = parsed.serial || "";
+      document.getElementById("expiry").textContent = parsed.expiry || "";
+      document.getElementById("batch").textContent = parsed.batch || "";
+      document.getElementById("raw").textContent = code;
+      document.getElementById("sendStatus").textContent = "جاري الإرسال...";
+
+      document.getElementById("resultBox").style.display = "block";
+
+      btn.disabled = true;
+      btn.textContent = "جاري الحفظ...";
+
+      const formData = new FormData();
+      formData.append("rawBarcode", code);
+
+      fetch(scriptUrl, {
+        method: "POST",
+        mode: "no-cors",
+        body: formData
+      })
+        .then(function() {
+          btn.disabled = false;
+          btn.textContent = "حفظ في الشيت";
+          document.getElementById("sendStatus").textContent = "Sent to Google Sheet";
+          showSuccess("تم إرسال البيانات إلى Google Sheet. افتحي الشيت وتأكدي من ظهور السطر.");
+          document.getElementById("codeInput").value = "";
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = "حفظ في الشيت";
+          document.getElementById("sendStatus").textContent = "Send failed";
+          showError("فشل الإرسال إلى الشيت: " + err);
+        });
+    }
+
+    function parseGS1Local(input) {
+      const text = String(input || "").trim();
+
+      const result = {};
+      const regex = /\((\d{2,4})\)([^\(]+)/g;
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        result[match[1]] = String(match[2]).trim();
+      }
+
+      if (Object.keys(result).length === 0) {
+        const compact = text.replace(/\u001d/g, "").replace(/\s/g, "");
+
+        const idx01 = compact.indexOf("01");
+
+        if (idx01 >= 0 && compact.length >= idx01 + 16) {
+          result["01"] = compact.substring(idx01 + 2, idx01 + 16);
+        }
+
+        const idx17 = compact.indexOf("17", idx01 + 16);
+
+        if (idx17 >= 0) {
+          result["17"] = compact.substring(idx17 + 2, idx17 + 8);
+        }
+
+        const idx21 = compact.indexOf("21", idx01 + 16);
+
+        if (idx21 >= 0) {
+          const end21 = idx17 > idx21 ? idx17 : compact.length;
+          result["21"] = compact.substring(idx21 + 2, end21);
+        }
+
+        const idx10 = compact.indexOf("10", idx17 >= 0 ? idx17 + 8 : 0);
+
+        if (idx10 >= 0) {
+          result["10"] = compact.substring(idx10 + 2);
+        }
+      }
+
+      const gtin = result["01"] || "";
+      const serial = result["21"] || "";
+      const expiry = formatExpiryLocal(result["17"] || "");
+      const batch = result["10"] || "";
+
+      return {
+        gtin,
+        serial,
+        expiry,
+        batch
+      };
+    }
+
+    function formatExpiryLocal(yyMMdd) {
+      if (!yyMMdd || String(yyMMdd).length !== 6) {
+        return "";
+      }
+
+      const s = String(yyMMdd);
+      const yy = Number(s.substring(0, 2));
+      const yyyy = yy >= 50 ? 1900 + yy : 2000 + yy;
+
+      return yyyy + "-" + s.substring(2, 4) + "-" + s.substring(4, 6);
+    }
+
+    function clearForm() {
+      document.getElementById("codeInput").value = "";
+      hideError();
+      hideSuccess();
+      hideResult();
+    }
+
+    function showError(message) {
+      const box = document.getElementById("errorBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    function showSuccess(message) {
+      const box = document.getElementById("successBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideSuccess() {
+      document.getElementById("successBox").style.display = "none";
+    }
+
+    function hideResult() {
+      document.getElementById("resultBox").style.display = "none";
+    }
+  </script>
+</body>
+</html>
