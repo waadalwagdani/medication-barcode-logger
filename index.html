@@ -52,13 +52,109 @@
       margin-bottom: 16px;
     }
 
+    .camera-frame {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+      display: none;
+      min-height: 320px;
+    }
+
     video {
       width: 100%;
-      max-height: 390px;
+      height: 420px;
       background: #000;
-      border-radius: 16px;
-      display: none;
+      display: block;
       object-fit: cover;
+    }
+
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.45));
+    }
+
+    .target-box {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(72vw, 320px);
+      height: min(72vw, 320px);
+      transform: translate(-50%, -50%);
+      border: 3px solid #ffffff;
+      border-radius: 22px;
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.28);
+    }
+
+    .corner {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      border-color: #22c55e;
+      border-style: solid;
+    }
+
+    .corner.tl {
+      top: -3px;
+      left: -3px;
+      border-width: 5px 0 0 5px;
+      border-radius: 18px 0 0 0;
+    }
+
+    .corner.tr {
+      top: -3px;
+      right: -3px;
+      border-width: 5px 5px 0 0;
+      border-radius: 0 18px 0 0;
+    }
+
+    .corner.bl {
+      bottom: -3px;
+      left: -3px;
+      border-width: 0 0 5px 5px;
+      border-radius: 0 0 0 18px;
+    }
+
+    .corner.br {
+      bottom: -3px;
+      right: -3px;
+      border-width: 0 5px 5px 0;
+      border-radius: 0 0 18px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: 50%;
+      height: 3px;
+      background: #22c55e;
+      box-shadow: 0 0 18px #22c55e;
+      animation: scanMove 1.7s ease-in-out infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: 15%; }
+      50% { top: 85%; }
+      100% { top: 15%; }
+    }
+
+    .camera-label {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 14px;
+      color: #ffffff;
+      font-size: 13px;
+      text-align: center;
+      background: rgba(0,0,0,0.48);
+      border-radius: 999px;
+      padding: 8px 12px;
+      backdrop-filter: blur(8px);
     }
 
     label {
@@ -114,6 +210,10 @@
     button.light {
       background: #e8eef2;
       color: #172033;
+    }
+
+    button.capture {
+      background: #137a3f;
     }
 
     button:disabled {
@@ -212,19 +312,37 @@
       <h1>Medication Barcode Logger</h1>
 
       <p class="subtitle">
-        صوري باركود الدواء أو الصقي النص الناتج منه. الأداة تفك GTIN وSerial وExpiry وBatch، ثم ترسل البيانات تلقائيًا إلى Google Sheet.
+        صوري باركود الدواء داخل المربع الأخضر. الأداة تفك GTIN وSerial وExpiry وBatch، ثم ترسل البيانات تلقائيًا إلى Google Sheet.
       </p>
 
       <div class="scanner-box">
-        <video id="video" playsinline muted></video>
+        <div id="cameraFrame" class="camera-frame">
+          <video id="video" playsinline muted></video>
+
+          <div class="scan-overlay"></div>
+
+          <div class="target-box">
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="scan-line"></div>
+          </div>
+
+          <div class="camera-label">
+            وجهي الباركود داخل المربع وانتظري القراءة أو اضغطي قراءة الباركود الآن
+          </div>
+        </div>
 
         <div class="buttons">
           <button type="button" onclick="startScanner()">فتح الكاميرا</button>
+          <button type="button" class="capture" onclick="readNow()">قراءة الباركود الآن</button>
           <button type="button" class="light" onclick="stopScanner()">إيقاف الكاميرا</button>
+          <button type="button" class="secondary" onclick="submitCode()">حفظ النص الموجود</button>
         </div>
 
         <div class="hint">
-          افتحي هذه الصفحة من Chrome أو Safari كرابط HTTPS مباشر. لا تفتحيها من داخل واتساب أو Gmail.
+          إذا ما قرأ بسرعة: قرّبي العلبة، ثبتي يدك، خلي الإضاءة قوية، وخلي باركود DataMatrix داخل المربع بالكامل.
         </div>
       </div>
 
@@ -282,23 +400,25 @@
 
     let codeReader = null;
     let isScanning = false;
+    let lastResultText = "";
 
     function startScanner() {
       hideError();
       hideSuccess();
-
-      const video = document.getElementById("video");
-      video.style.display = "block";
 
       if (!window.ZXing) {
         showError("مكتبة قارئ الباركود لم تُحمّل. تأكدي من الاتصال بالإنترنت ثم أعيدي فتح الصفحة.");
         return;
       }
 
-      stopScanner();
+      stopScanner(false);
+
+      const cameraFrame = document.getElementById("cameraFrame");
+      cameraFrame.style.display = "block";
 
       codeReader = new ZXing.BrowserMultiFormatReader();
       isScanning = true;
+      lastResultText = "";
 
       codeReader
         .decodeFromConstraints(
@@ -313,14 +433,19 @@
           function(result, err) {
             if (result && isScanning) {
               const text = result.getText();
-              document.getElementById("codeInput").value = text;
-              stopScanner();
-              submitCode();
+
+              if (text && text !== lastResultText) {
+                lastResultText = text;
+                document.getElementById("codeInput").value = text;
+                showSuccess("تمت قراءة الباركود. جاري الإرسال للشيت...");
+                stopScanner(false);
+                submitCode();
+              }
             }
           }
         )
         .catch(function(err) {
-          stopScanner();
+          stopScanner(false);
 
           let message = "تعذر فتح الكاميرا: " + err;
 
@@ -333,16 +458,41 @@
         });
     }
 
-    function stopScanner() {
+    function readNow() {
+      hideError();
+      hideSuccess();
+
+      const code = document.getElementById("codeInput").value.trim();
+
+      if (code) {
+        submitCode();
+        return;
+      }
+
+      if (!isScanning) {
+        showError("افتحي الكاميرا أولًا، ثم وجهي الباركود داخل المربع.");
+        return;
+      }
+
+      showSuccess("الكاميرا تعمل الآن. ثبتي الباركود داخل المربع، وسيتم الالتقاط تلقائيًا.");
+    }
+
+    function stopScanner(hideMessage = true) {
       isScanning = false;
 
       if (codeReader) {
-        codeReader.reset();
+        try {
+          codeReader.reset();
+        } catch (e) {}
         codeReader = null;
       }
 
-      const video = document.getElementById("video");
-      video.style.display = "none";
+      const cameraFrame = document.getElementById("cameraFrame");
+      cameraFrame.style.display = "none";
+
+      if (hideMessage) {
+        hideSuccess();
+      }
     }
 
     function submitCode() {
@@ -467,6 +617,7 @@
 
     function clearForm() {
       document.getElementById("codeInput").value = "";
+      lastResultText = "";
       hideError();
       hideSuccess();
       hideResult();
