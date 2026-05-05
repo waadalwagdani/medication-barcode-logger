@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Medication Approval Scanner</title>
+
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      color: #172033;
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      color: #0f2f4a;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: #667085;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .scanner-box {
+      background: #f3f7f9;
+      border: 1px solid #d8e4e8;
+      border-radius: 18px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .camera-frame {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+      display: none;
+      min-height: 360px;
+    }
+
+    video {
+      width: 100%;
+      height: 460px;
+      background: #000;
+      display: block;
+      object-fit: cover;
+    }
+
+    .target-box {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(78vw, 360px);
+      height: min(78vw, 360px);
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 24px;
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.30);
+      pointer-events: none;
+    }
+
+    .corner {
+      position: absolute;
+      width: 42px;
+      height: 42px;
+      border-color: #22c55e;
+      border-style: solid;
+    }
+
+    .corner.tl { top: -3px; left: -3px; border-width: 6px 0 0 6px; border-radius: 20px 0 0 0; }
+    .corner.tr { top: -3px; right: -3px; border-width: 6px 6px 0 0; border-radius: 0 20px 0 0; }
+    .corner.bl { bottom: -3px; left: -3px; border-width: 0 0 6px 6px; border-radius: 0 0 0 20px; }
+    .corner.br { bottom: -3px; right: -3px; border-width: 0 6px 6px 0; border-radius: 0 0 20px 0; }
+
+    .scan-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 50%;
+      height: 3px;
+      background: #22c55e;
+      box-shadow: 0 0 18px #22c55e;
+      animation: scanMove 1.6s ease-in-out infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: 12%; }
+      50% { top: 88%; }
+      100% { top: 12%; }
+    }
+
+    .camera-label {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 14px;
+      color: #ffffff;
+      font-size: 13px;
+      text-align: center;
+      background: rgba(0,0,0,0.50);
+      border-radius: 999px;
+      padding: 9px 12px;
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+    }
+
+    .live-status {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      background: #eefaf3;
+      border: 1px solid #bde8ce;
+      color: #137a3f;
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 8px;
+      font-weight: 700;
+      color: #344054;
+      font-size: 13px;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      border: 1px solid #cfd6df;
+      border-radius: 14px;
+      font-size: 14px;
+      outline: none;
+      background: white;
+    }
+
+    textarea {
+      min-height: 78px;
+      resize: vertical;
+      direction: ltr;
+      text-align: left;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: #0f6372;
+      box-shadow: 0 0 0 4px rgba(15, 99, 114, 0.12);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      background: #0f6372;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary { background: #172033; }
+    button.light { background: #e8eef2; color: #172033; }
+    button.reject { background: #9b1c1c; }
+    button.approve { background: #137a3f; }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.7;
+      margin-top: 10px;
+    }
+
+    .panel {
+      margin-top: 18px;
+      display: none;
+      border-radius: 18px;
+      padding: 16px;
+      background: #f3fbfc;
+      border: 1px solid #cdebef;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #0f6372;
+    }
+
+    .candidate {
+      background: white;
+      border: 1px solid #dfe7ea;
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .candidate.selected {
+      border-color: #0f6372;
+      box-shadow: 0 0 0 4px rgba(15, 99, 114, 0.12);
+    }
+
+    .candidate-title {
+      font-weight: 800;
+      color: #172033;
+      margin-bottom: 4px;
+      direction: ltr;
+      text-align: left;
+    }
+
+    .candidate-meta {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.6;
+      direction: ltr;
+      text-align: left;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .error {
+      display: none;
+      margin-top: 16px;
+      background: #fff1f1;
+      border: 1px solid #ffc9c9;
+      color: #9b1c1c;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+    }
+
+    .success {
+      display: none;
+      margin-top: 16px;
+      background: #eefaf3;
+      border: 1px solid #bde8ce;
+      color: #137a3f;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    @media (min-width: 720px) {
+      .buttons { grid-template-columns: 1fr 1fr; }
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Medication Approval Scanner</h1>
+
+      <p class="subtitle">
+        السكان لا يحفظ نهائيًا مباشرة. الأداة تقترح المنتج أولًا، ثم أنتِ تختارين/تعدلين وتضغطين اعتماد وحفظ.
+      </p>
+
+      <div class="scanner-box">
+        <div id="cameraFrame" class="camera-frame">
+          <video id="video" playsinline muted></video>
+
+          <div class="target-box">
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="scan-line"></div>
+          </div>
+
+          <div class="camera-label">
+            وجهي الباركود داخل المربع — بعد القراءة ستظهر خيارات الاعتماد
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="startBtn" type="button" onclick="startScanner()">تشغيل الماسح</button>
+          <button type="button" class="light" onclick="stopScanner()">إيقاف الماسح</button>
+        </div>
+
+        <div id="liveStatus" class="live-status"></div>
+      </div>
+
+      <label for="codeInput">آخر كود تمت قراءته / أو الصقي الكود يدويًا</label>
+      <textarea id="codeInput" placeholder="مثال: (01)06285094000882(21)00000002417305(17)270630(10)F250574"></textarea>
+
+      <div class="buttons">
+        <button id="lookupBtn" type="button" onclick="lookupCode(false)">بحث عن المنتج</button>
+        <button type="button" class="secondary" onclick="clearAll()">مسح</button>
+      </div>
+
+      <div id="errorBox" class="error"></div>
+      <div id="successBox" class="success"></div>
+
+      <div id="approvalPanel" class="panel">
+        <h2>نتيجة البحث — اختاري المنتج الصحيح ثم اعتمدي</h2>
+
+        <div class="grid">
+          <div>
+            <label>GTIN Original</label>
+            <input id="gtinOriginal" readonly />
+          </div>
+
+          <div>
+            <label>GTIN Search Variant</label>
+            <input id="gtinSearch" readonly />
+          </div>
+
+          <div>
+            <label>Serial Number</label>
+            <input id="serial" readonly />
+          </div>
+
+          <div>
+            <label>Batch Number</label>
+            <input id="batch" readonly />
+          </div>
+
+          <div>
+            <label>Expiry Year</label>
+            <input id="expiryYear" readonly />
+          </div>
+
+          <div>
+            <label>Expiry Month</label>
+            <input id="expiryMonth" readonly />
+          </div>
+
+          <div>
+            <label>Expiry Day</label>
+            <input id="expiryDay" readonly />
+          </div>
+
+          <div>
+            <label>Expiry Date</label>
+            <input id="expiryDate" readonly />
+          </div>
+        </div>
+
+        <h2 style="margin-top:18px;">الخيارات المقترحة</h2>
+        <div id="candidatesBox"></div>
+
+        <h2 style="margin-top:18px;">النسخة النهائية قبل الحفظ</h2>
+
+        <div class="grid">
+          <div>
+            <label>Product Name</label>
+            <input id="productName" />
+          </div>
+
+          <div>
+            <label>Scientific Name</label>
+            <input id="scientificName" />
+          </div>
+
+          <div>
+            <label>Brand</label>
+            <input id="brand" />
+          </div>
+
+          <div>
+            <label>Strength</label>
+            <input id="strength" />
+          </div>
+
+          <div>
+            <label>Dosage Form</label>
+            <input id="dosageForm" />
+          </div>
+
+          <div>
+            <label>Package</label>
+            <input id="packageValue" />
+          </div>
+
+          <div>
+            <label>Category</label>
+            <input id="category" />
+          </div>
+
+          <div>
+            <label>Lookup Source</label>
+            <input id="source" />
+          </div>
+        </div>
+
+        <label>Evidence / Notes</label>
+        <textarea id="evidence"></textarea>
+
+        <div class="buttons">
+          <button id="approveBtn" type="button" class="approve" onclick="approveAndSave()">اعتماد وحفظ في الشيت</button>
+          <button type="button" class="reject" onclick="rejectCurrent()">رفض وعدم الحفظ</button>
+        </div>
+
+        <div class="hint">
+          لن يتم حفظ الصنف في SCANS إلا بعد ضغط اعتماد وحفظ.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz3wrv-kta8xTdC39lhM_b9Ul--6-aQ7Q28cC2VQgbfzQfVj6R4fu5vXQzuVgAaZg2x/exec";
+
+    let codeReader = null;
+    let isScanning = false;
+    let currentRawBarcode = "";
+    let currentCandidates = [];
+    let lastScannedText = "";
+    let lastScannedAt = 0;
+
+    const DUPLICATE_BLOCK_MS = 3500;
+
+    function startScanner() {
+      hideError();
+      hideSuccess();
+      setLiveStatus("جاري تشغيل الكاميرا...");
+
+      if (!window.ZXing) {
+        showError("مكتبة قارئ الباركود لم تُحمّل. تأكدي من الاتصال بالإنترنت ثم أعيدي فتح الصفحة.");
+        return;
+      }
+
+      document.getElementById("cameraFrame").style.display = "block";
+
+      if (codeReader) {
+        try { codeReader.reset(); } catch (e) {}
+      }
+
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      isScanning = true;
+      document.getElementById("startBtn").disabled = true;
+
+      codeReader
+        .decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              focusMode: "continuous"
+            }
+          },
+          "video",
+          function(result, err) {
+            if (!isScanning) return;
+
+            if (result) {
+              const text = result.getText();
+              if (!text) return;
+
+              const now = Date.now();
+
+              if (text === lastScannedText && now - lastScannedAt < DUPLICATE_BLOCK_MS) {
+                return;
+              }
+
+              lastScannedText = text;
+              lastScannedAt = now;
+
+              document.getElementById("codeInput").value = text;
+
+              try {
+                navigator.vibrate && navigator.vibrate(120);
+              } catch (e) {}
+
+              setLiveStatus("تمت قراءة الباركود. جاري البحث عن المنتج...");
+              stopScanner(false);
+              lookupCode(true);
+            }
+          }
+        )
+        .then(function() {
+          setLiveStatus("الماسح يعمل الآن. وجهي الباركود داخل المربع.");
+        })
+        .catch(function(err) {
+          stopScanner(false);
+          showError("تعذر فتح الكاميرا: " + err);
+        });
+    }
+
+    function stopScanner(showMsg = true) {
+      isScanning = false;
+
+      if (codeReader) {
+        try { codeReader.reset(); } catch (e) {}
+        codeReader = null;
+      }
+
+      document.getElementById("cameraFrame").style.display = "none";
+      document.getElementById("startBtn").disabled = false;
+
+      if (showMsg) setLiveStatus("تم إيقاف الماسح.");
+    }
+
+    function lookupCode(fromScan) {
+      hideError();
+      hideSuccess();
+
+      const rawBarcode = document.getElementById("codeInput").value.trim();
+
+      if (!rawBarcode) {
+        showError("أدخلي أو صوري الباركود أولًا.");
+        return;
+      }
+
+      currentRawBarcode = rawBarcode;
+      document.getElementById("lookupBtn").disabled = true;
+      document.getElementById("lookupBtn").textContent = "جاري البحث...";
+
+      jsonpRequest({
+        action: "lookup",
+        rawBarcode: rawBarcode
+      }, function(res) {
+        document.getElementById("lookupBtn").disabled = false;
+        document.getElementById("lookupBtn").textContent = "بحث عن المنتج";
+
+        if (!res || !res.ok) {
+          showError(res && res.error ? res.error : "فشل البحث.");
+          return;
+        }
+
+        renderLookupResult(res);
+        setLiveStatus("راجعي النتيجة. لن يتم الحفظ إلا بعد الاعتماد.");
+      });
+    }
+
+    function renderLookupResult(res) {
+      const p = res.parsed || {};
+
+      document.getElementById("gtinOriginal").value = p.gtinOriginal || "";
+      document.getElementById("gtinSearch").value = p.gtinSearch || "";
+      document.getElementById("serial").value = p.serial || "";
+      document.getElementById("batch").value = p.batch || "";
+      document.getElementById("expiryYear").value = p.expiryYear || "";
+      document.getElementById("expiryMonth").value = p.expiryMonth || "";
+      document.getElementById("expiryDay").value = p.expiryDay || "";
+      document.getElementById("expiryDate").value = p.expiryDate || "";
+
+      currentCandidates = res.candidates || [];
+
+      const box = document.getElementById("candidatesBox");
+      box.innerHTML = "";
+
+      if (!currentCandidates.length) {
+        box.innerHTML = '<div class="candidate"><div class="candidate-title">No confident candidate found</div><div class="candidate-meta">اكتبي بيانات المنتج يدويًا في الحقول تحت ثم اضغطي اعتماد وحفظ.</div></div>';
+        fillCandidateForm({});
+      } else {
+        currentCandidates.forEach(function(c, index) {
+          const div = document.createElement("div");
+          div.className = "candidate" + (index === 0 ? " selected" : "");
+          div.onclick = function() {
+            selectCandidate(index);
+          };
+
+          div.innerHTML =
+            '<div class="candidate-title">' + escapeHtml(c.productName || "Unknown") + '</div>' +
+            '<div class="candidate-meta">' +
+            'Scientific: ' + escapeHtml(c.scientificName || "") + '<br>' +
+            'Brand: ' + escapeHtml(c.brand || "") + '<br>' +
+            'Strength: ' + escapeHtml(c.strength || "") + '<br>' +
+            'Form: ' + escapeHtml(c.dosageForm || "") + '<br>' +
+            'Package: ' + escapeHtml(c.package || "") + '<br>' +
+            'Confidence: ' + escapeHtml(String(c.confidence || "")) + '<br>' +
+            'Source: ' + escapeHtml(c.source || "") + '<br>' +
+            'Evidence: ' + escapeHtml(c.evidence || "") +
+            '</div>';
+
+          box.appendChild(div);
+        });
+
+        fillCandidateForm(currentCandidates[0]);
+      }
+
+      document.getElementById("approvalPanel").style.display = "block";
+    }
+
+    function selectCandidate(index) {
+      const cards = document.querySelectorAll(".candidate");
+      cards.forEach(function(card) {
+        card.classList.remove("selected");
+      });
+
+      if (cards[index]) cards[index].classList.add("selected");
+
+      fillCandidateForm(currentCandidates[index] || {});
+    }
+
+    function fillCandidateForm(c) {
+      document.getElementById("productName").value = c.productName || "";
+      document.getElementById("scientificName").value = c.scientificName || "";
+      document.getElementById("brand").value = c.brand || "";
+      document.getElementById("strength").value = c.strength || "";
+      document.getElementById("dosageForm").value = c.dosageForm || "";
+      document.getElementById("packageValue").value = c.package || "";
+      document.getElementById("category").value = c.category || "";
+      document.getElementById("source").value = c.source || "";
+      document.getElementById("evidence").value = c.evidence || "";
+    }
+
+    function approveAndSave() {
+      hideError();
+      hideSuccess();
+
+      const productName = document.getElementById("productName").value.trim();
+
+      if (!productName) {
+        showError("لازم Product Name قبل الاعتماد.");
+        return;
+      }
+
+      document.getElementById("approveBtn").disabled = true;
+      document.getElementById("approveBtn").textContent = "جاري الحفظ...";
+
+      jsonpRequest({
+        action: "approve",
+        rawBarcode: currentRawBarcode,
+        productName: productName,
+        scientificName: document.getElementById("scientificName").value.trim(),
+        brand: document.getElementById("brand").value.trim(),
+        strength: document.getElementById("strength").value.trim(),
+        dosageForm: document.getElementById("dosageForm").value.trim(),
+        packageValue: document.getElementById("packageValue").value.trim(),
+        category: document.getElementById("category").value.trim(),
+        source: document.getElementById("source").value.trim(),
+        evidence: document.getElementById("evidence").value.trim()
+      }, function(res) {
+        document.getElementById("approveBtn").disabled = false;
+        document.getElementById("approveBtn").textContent = "اعتماد وحفظ في الشيت";
+
+        if (!res || !res.ok) {
+          showError(res && res.error ? res.error : "فشل الحفظ.");
+          return;
+        }
+
+        showSuccess("تم الاعتماد والحفظ: " + res.productName);
+        setLiveStatus("تم الحفظ النهائي في SCANS وتحديث PRODUCT_LOOKUP.");
+        document.getElementById("approvalPanel").style.display = "none";
+        document.getElementById("codeInput").value = "";
+      });
+    }
+
+    function rejectCurrent() {
+      hideError();
+      hideSuccess();
+
+      if (!currentRawBarcode) {
+        showError("ما فيه باركود حالي للرفض.");
+        return;
+      }
+
+      jsonpRequest({
+        action: "reject",
+        rawBarcode: currentRawBarcode,
+        reason: "User rejected candidates during scan approval stage."
+      }, function(res) {
+        if (!res || !res.ok) {
+          showError(res && res.error ? res.error : "فشل تسجيل الرفض.");
+          return;
+        }
+
+        showSuccess("تم رفض النتيجة. لم يتم حفظها في SCANS.");
+        document.getElementById("approvalPanel").style.display = "none";
+        document.getElementById("codeInput").value = "";
+      });
+    }
+
+    function jsonpRequest(params, callback) {
+      const callbackName = "cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+
+      window[callbackName] = function(response) {
+        callback(response);
+
+        try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
+
+        const oldScript = document.getElementById(callbackName);
+        if (oldScript) oldScript.remove();
+      };
+
+      const query = Object.keys(params)
+        .map(function(key) {
+          return encodeURIComponent(key) + "=" + encodeURIComponent(params[key] || "");
+        })
+        .join("&");
+
+      const script = document.createElement("script");
+      script.id = callbackName;
+      script.src = SCRIPT_WEB_APP_URL + "?" + query + "&callback=" + encodeURIComponent(callbackName) + "&_=" + Date.now();
+
+      script.onerror = function() {
+        callback({
+          ok: false,
+          error: "تعذر الاتصال بـ Apps Script."
+        });
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function clearAll() {
+      document.getElementById("codeInput").value = "";
+      document.getElementById("approvalPanel").style.display = "none";
+      hideError();
+      hideSuccess();
+      setLiveStatus("تم المسح.");
+    }
+
+    function setLiveStatus(message) {
+      const box = document.getElementById("liveStatus");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function showError(message) {
+      const box = document.getElementById("errorBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    function showSuccess(message) {
+      const box = document.getElementById("successBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideSuccess() {
+      document.getElementById("successBox").style.display = "none";
+    }
+
+    function escapeHtml(text) {
+      return String(text || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
