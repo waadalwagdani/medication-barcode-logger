@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Medication Barcode Logger</title>
+
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      color: #172033;
+    }
+
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 25px;
+      color: #0f2f4a;
+    }
+
+    .subtitle {
+      margin: 0 0 22px;
+      color: #667085;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .scanner-box {
+      background: #f3f7f9;
+      border: 1px solid #d8e4e8;
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .camera-frame {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+      display: none;
+      min-height: 320px;
+    }
+
+    video {
+      width: 100%;
+      height: 420px;
+      background: #000;
+      display: block;
+      object-fit: cover;
+    }
+
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.45));
+    }
+
+    .target-box {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(72vw, 320px);
+      height: min(72vw, 320px);
+      transform: translate(-50%, -50%);
+      border: 3px solid #ffffff;
+      border-radius: 22px;
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.28);
+    }
+
+    .corner {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      border-color: #22c55e;
+      border-style: solid;
+    }
+
+    .corner.tl {
+      top: -3px;
+      left: -3px;
+      border-width: 5px 0 0 5px;
+      border-radius: 18px 0 0 0;
+    }
+
+    .corner.tr {
+      top: -3px;
+      right: -3px;
+      border-width: 5px 5px 0 0;
+      border-radius: 0 18px 0 0;
+    }
+
+    .corner.bl {
+      bottom: -3px;
+      left: -3px;
+      border-width: 0 0 5px 5px;
+      border-radius: 0 0 0 18px;
+    }
+
+    .corner.br {
+      bottom: -3px;
+      right: -3px;
+      border-width: 0 5px 5px 0;
+      border-radius: 0 0 18px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: 50%;
+      height: 3px;
+      background: #22c55e;
+      box-shadow: 0 0 18px #22c55e;
+      animation: scanMove 1.7s ease-in-out infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: 15%; }
+      50% { top: 85%; }
+      100% { top: 15%; }
+    }
+
+    .camera-label {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 14px;
+      color: #ffffff;
+      font-size: 13px;
+      text-align: center;
+      background: rgba(0,0,0,0.48);
+      border-radius: 999px;
+      padding: 8px 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-weight: 700;
+      color: #344054;
+    }
+
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      border: 1px solid #cfd6df;
+      border-radius: 16px;
+      font-size: 15px;
+      outline: none;
+      background: white;
+      min-height: 110px;
+      resize: vertical;
+      direction: ltr;
+      text-align: left;
+    }
+
+    textarea:focus {
+      border-color: #0f6372;
+      box-shadow: 0 0 0 4px rgba(15, 99, 114, 0.12);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      background: #0f6372;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #172033;
+    }
+
+    button.light {
+      background: #e8eef2;
+      color: #172033;
+    }
+
+    button.capture {
+      background: #137a3f;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.7;
+      margin-top: 10px;
+    }
+
+    .result {
+      margin-top: 22px;
+      display: none;
+      border-radius: 18px;
+      padding: 18px;
+      background: #f3fbfc;
+      border: 1px solid #cdebef;
+    }
+
+    .result h2 {
+      margin: 0 0 12px;
+      font-size: 19px;
+      color: #0f6372;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .item {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .key {
+      font-size: 12px;
+      color: #667085;
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-size: 15px;
+      font-weight: 700;
+      color: #172033;
+      direction: ltr;
+      text-align: left;
+      word-break: break-word;
+    }
+
+    .error {
+      display: none;
+      margin-top: 16px;
+      background: #fff1f1;
+      border: 1px solid #ffc9c9;
+      color: #9b1c1c;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+    }
+
+    .success {
+      display: none;
+      margin-top: 16px;
+      background: #eefaf3;
+      border: 1px solid #bde8ce;
+      color: #137a3f;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    @media (min-width: 640px) {
+      .buttons {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Medication Barcode Logger</h1>
+
+      <p class="subtitle">
+        صوري باركود الدواء داخل المربع الأخضر. الأداة تفك GTIN وSerial وExpiry وBatch، ثم ترسل البيانات تلقائيًا إلى Google Sheet.
+      </p>
+
+      <div class="scanner-box">
+        <div id="cameraFrame" class="camera-frame">
+          <video id="video" playsinline muted></video>
+
+          <div class="scan-overlay"></div>
+
+          <div class="target-box">
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="scan-line"></div>
+          </div>
+
+          <div class="camera-label">
+            وجهي الباركود داخل المربع وانتظري القراءة أو اضغطي قراءة الباركود الآن
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button type="button" onclick="startScanner()">فتح الكاميرا</button>
+          <button type="button" class="capture" onclick="readNow()">قراءة الباركود الآن</button>
+          <button type="button" class="light" onclick="stopScanner()">إيقاف الكاميرا</button>
+          <button type="button" class="secondary" onclick="submitCode()">حفظ النص الموجود</button>
+        </div>
+
+        <div class="hint">
+          إذا ما قرأ بسرعة: قرّبي العلبة، ثبتي يدك، خلي الإضاءة قوية، وخلي باركود DataMatrix داخل المربع بالكامل.
+        </div>
+      </div>
+
+      <label for="codeInput">كود الباركود</label>
+      <textarea id="codeInput" placeholder="مثال: (01)06285108000136(21)0000051933888(17)270430(10)6101527"></textarea>
+
+      <div class="buttons">
+        <button id="submitBtn" type="button" onclick="submitCode()">حفظ في الشيت</button>
+        <button type="button" class="secondary" onclick="clearForm()">مسح</button>
+      </div>
+
+      <div id="errorBox" class="error"></div>
+      <div id="successBox" class="success"></div>
+
+      <div id="resultBox" class="result">
+        <h2>تمت قراءة البيانات</h2>
+
+        <div class="grid">
+          <div class="item">
+            <div class="key">GTIN</div>
+            <div class="value" id="gtin"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Serial Number</div>
+            <div class="value" id="serial"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Expiry Date</div>
+            <div class="value" id="expiry"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Batch Number</div>
+            <div class="value" id="batch"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Raw Barcode</div>
+            <div class="value" id="raw"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Send Status</div>
+            <div class="value" id="sendStatus"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyg6KwxpRs8qo21BetIq_PGOHm2qWBTg92hdQE16FqSw6L21z2uhqzUxK5YyYf_C82Utg/exec";
+
+    let codeReader = null;
+    let isScanning = false;
+    let lastResultText = "";
+
+    function startScanner() {
+      hideError();
+      hideSuccess();
+
+      if (!window.ZXing) {
+        showError("مكتبة قارئ الباركود لم تُحمّل. تأكدي من الاتصال بالإنترنت ثم أعيدي فتح الصفحة.");
+        return;
+      }
+
+      stopScanner(false);
+
+      const cameraFrame = document.getElementById("cameraFrame");
+      cameraFrame.style.display = "block";
+
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      isScanning = true;
+      lastResultText = "";
+
+      codeReader
+        .decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          "video",
+          function(result, err) {
+            if (result && isScanning) {
+              const text = result.getText();
+
+              if (text && text !== lastResultText) {
+                lastResultText = text;
+                document.getElementById("codeInput").value = text;
+                showSuccess("تمت قراءة الباركود. جاري الإرسال للشيت...");
+                stopScanner(false);
+                submitCode();
+              }
+            }
+          }
+        )
+        .catch(function(err) {
+          stopScanner(false);
+
+          let message = "تعذر فتح الكاميرا: " + err;
+
+          if (String(err).includes("NotAllowedError")) {
+            message =
+              "المتصفح منع الكاميرا. افتحي الصفحة كرابط HTTPS مباشر من Chrome/Safari، ثم من إعدادات الموقع اختاري Camera = Allow.";
+          }
+
+          showError(message);
+        });
+    }
+
+    function readNow() {
+      hideError();
+      hideSuccess();
+
+      const code = document.getElementById("codeInput").value.trim();
+
+      if (code) {
+        submitCode();
+        return;
+      }
+
+      if (!isScanning) {
+        showError("افتحي الكاميرا أولًا، ثم وجهي الباركود داخل المربع.");
+        return;
+      }
+
+      showSuccess("الكاميرا تعمل الآن. ثبتي الباركود داخل المربع، وسيتم الالتقاط تلقائيًا.");
+    }
+
+    function stopScanner(hideMessage = true) {
+      isScanning = false;
+
+      if (codeReader) {
+        try {
+          codeReader.reset();
+        } catch (e) {}
+        codeReader = null;
+      }
+
+      const cameraFrame = document.getElementById("cameraFrame");
+      cameraFrame.style.display = "none";
+
+      if (hideMessage) {
+        hideSuccess();
+      }
+    }
+
+    function submitCode() {
+      const code = document.getElementById("codeInput").value.trim();
+      const btn = document.getElementById("submitBtn");
+
+      hideError();
+      hideSuccess();
+      hideResult();
+
+      if (!code) {
+        showError("الرجاء إدخال أو تصوير كود الباركود.");
+        return;
+      }
+
+      const parsed = parseGS1Local(code);
+
+      if (!parsed.gtin) {
+        showError("لم أستطع استخراج GTIN. تأكدي أن الكود يحتوي على (01).");
+        return;
+      }
+
+      document.getElementById("gtin").textContent = parsed.gtin || "";
+      document.getElementById("serial").textContent = parsed.serial || "";
+      document.getElementById("expiry").textContent = parsed.expiry || "";
+      document.getElementById("batch").textContent = parsed.batch || "";
+      document.getElementById("raw").textContent = code;
+      document.getElementById("sendStatus").textContent = "جاري الإرسال...";
+
+      document.getElementById("resultBox").style.display = "block";
+
+      btn.disabled = true;
+      btn.textContent = "جاري الحفظ...";
+
+      const formData = new FormData();
+      formData.append("rawBarcode", code);
+
+      fetch(SCRIPT_WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: formData
+      })
+        .then(function() {
+          btn.disabled = false;
+          btn.textContent = "حفظ في الشيت";
+          document.getElementById("sendStatus").textContent = "Sent to Google Sheet";
+          showSuccess("تم إرسال البيانات إلى Google Sheet. افتحي الشيت وتأكدي من ظهور السطر.");
+          document.getElementById("codeInput").value = "";
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = "حفظ في الشيت";
+          document.getElementById("sendStatus").textContent = "Send failed";
+          showError("فشل الإرسال إلى الشيت: " + err);
+        });
+    }
+
+    function parseGS1Local(input) {
+      const text = String(input || "").trim();
+
+      const result = {};
+      const regex = /\((\d{2,4})\)([^\(]+)/g;
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        result[match[1]] = String(match[2]).trim();
+      }
+
+      if (Object.keys(result).length === 0) {
+        const compact = text.replace(/\u001d/g, "").replace(/\s/g, "");
+
+        const idx01 = compact.indexOf("01");
+
+        if (idx01 >= 0 && compact.length >= idx01 + 16) {
+          result["01"] = compact.substring(idx01 + 2, idx01 + 16);
+        }
+
+        const idx17 = compact.indexOf("17", idx01 + 16);
+
+        if (idx17 >= 0) {
+          result["17"] = compact.substring(idx17 + 2, idx17 + 8);
+        }
+
+        const idx21 = compact.indexOf("21", idx01 + 16);
+
+        if (idx21 >= 0) {
+          const end21 = idx17 > idx21 ? idx17 : compact.length;
+          result["21"] = compact.substring(idx21 + 2, end21);
+        }
+
+        const idx10 = compact.indexOf("10", idx17 >= 0 ? idx17 + 8 : 0);
+
+        if (idx10 >= 0) {
+          result["10"] = compact.substring(idx10 + 2);
+        }
+      }
+
+      const gtin = result["01"] || "";
+      const serial = result["21"] || "";
+      const expiry = formatExpiryLocal(result["17"] || "");
+      const batch = result["10"] || "";
+
+      return {
+        gtin,
+        serial,
+        expiry,
+        batch
+      };
+    }
+
+    function formatExpiryLocal(yyMMdd) {
+      if (!yyMMdd || String(yyMMdd).length !== 6) {
+        return "";
+      }
+
+      const s = String(yyMMdd);
+      const yy = Number(s.substring(0, 2));
+      const yyyy = yy >= 50 ? 1900 + yy : 2000 + yy;
+
+      return yyyy + "-" + s.substring(2, 4) + "-" + s.substring(4, 6);
+    }
+
+    function clearForm() {
+      document.getElementById("codeInput").value = "";
+      lastResultText = "";
+      hideError();
+      hideSuccess();
+      hideResult();
+    }
+
+    function showError(message) {
+      const box = document.getElementById("errorBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    function showSuccess(message) {
+      const box = document.getElementById("successBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideSuccess() {
+      document.getElementById("successBox").style.display = "none";
+    }
+
+    function hideResult() {
+      document.getElementById("resultBox").style.display = "none";
+    }
+  </script>
+</body>
+</html>
