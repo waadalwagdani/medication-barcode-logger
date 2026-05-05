@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Medication Barcode Logger</title>
+
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      color: #172033;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      color: #0f2f4a;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: #667085;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .scanner-box {
+      background: #f3f7f9;
+      border: 1px solid #d8e4e8;
+      border-radius: 18px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .camera-frame {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+      display: none;
+      min-height: 380px;
+    }
+
+    video {
+      width: 100%;
+      height: 480px;
+      background: #000;
+      display: block;
+      object-fit: cover;
+    }
+
+    .target-box {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(78vw, 360px);
+      height: min(78vw, 360px);
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 24px;
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.30);
+      pointer-events: none;
+    }
+
+    .corner {
+      position: absolute;
+      width: 42px;
+      height: 42px;
+      border-color: #22c55e;
+      border-style: solid;
+    }
+
+    .corner.tl {
+      top: -3px;
+      left: -3px;
+      border-width: 6px 0 0 6px;
+      border-radius: 20px 0 0 0;
+    }
+
+    .corner.tr {
+      top: -3px;
+      right: -3px;
+      border-width: 6px 6px 0 0;
+      border-radius: 0 20px 0 0;
+    }
+
+    .corner.bl {
+      bottom: -3px;
+      left: -3px;
+      border-width: 0 0 6px 6px;
+      border-radius: 0 0 0 20px;
+    }
+
+    .corner.br {
+      bottom: -3px;
+      right: -3px;
+      border-width: 0 6px 6px 0;
+      border-radius: 0 0 20px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 50%;
+      height: 3px;
+      background: #22c55e;
+      box-shadow: 0 0 18px #22c55e;
+      animation: scanMove 1.6s ease-in-out infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: 12%; }
+      50% { top: 88%; }
+      100% { top: 12%; }
+    }
+
+    .camera-label {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 14px;
+      color: #ffffff;
+      font-size: 13px;
+      text-align: center;
+      background: rgba(0,0,0,0.50);
+      border-radius: 999px;
+      padding: 9px 12px;
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+    }
+
+    .live-status {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      background: #eefaf3;
+      border: 1px solid #bde8ce;
+      color: #137a3f;
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-weight: 700;
+      color: #344054;
+    }
+
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      border: 1px solid #cfd6df;
+      border-radius: 16px;
+      font-size: 15px;
+      outline: none;
+      background: white;
+      min-height: 100px;
+      resize: vertical;
+      direction: ltr;
+      text-align: left;
+    }
+
+    textarea:focus {
+      border-color: #0f6372;
+      box-shadow: 0 0 0 4px rgba(15, 99, 114, 0.12);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      background: #0f6372;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #172033;
+    }
+
+    button.light {
+      background: #e8eef2;
+      color: #172033;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.7;
+      margin-top: 10px;
+    }
+
+    .result {
+      margin-top: 18px;
+      display: none;
+      border-radius: 18px;
+      padding: 16px;
+      background: #f3fbfc;
+      border: 1px solid #cdebef;
+    }
+
+    .result h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #0f6372;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .item {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .key {
+      font-size: 12px;
+      color: #667085;
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-size: 15px;
+      font-weight: 700;
+      color: #172033;
+      direction: ltr;
+      text-align: left;
+      word-break: break-word;
+    }
+
+    .error {
+      display: none;
+      margin-top: 16px;
+      background: #fff1f1;
+      border: 1px solid #ffc9c9;
+      color: #9b1c1c;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+    }
+
+    .success {
+      display: none;
+      margin-top: 16px;
+      background: #eefaf3;
+      border: 1px solid #bde8ce;
+      color: #137a3f;
+      border-radius: 14px;
+      padding: 12px;
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    @media (min-width: 640px) {
+      .buttons {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Medication Barcode Logger</h1>
+
+      <p class="subtitle">
+        شغّلي الماسح مرة واحدة، وجهي الباركود داخل المربع، والقراءة تصير تلقائيًا. بعد كل قراءة يتم البحث عن المنتج، ثم الإرسال للشيت، والكاميرا تظل شغالة للعلبة التالية.
+      </p>
+
+      <div class="scanner-box">
+        <div id="cameraFrame" class="camera-frame">
+          <video id="video" playsinline muted></video>
+
+          <div class="target-box">
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="scan-line"></div>
+          </div>
+
+          <div class="camera-label">
+            الماسح يعمل تلقائيًا — ضعي الباركود داخل المربع
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="startBtn" type="button" onclick="startScanner()">تشغيل الماسح</button>
+          <button type="button" class="light" onclick="stopScanner()">إيقاف الماسح</button>
+        </div>
+
+        <div id="liveStatus" class="live-status"></div>
+
+        <div class="hint">
+          المتصفح لا يسمح بفتح الكاميرا تلقائيًا بدون ضغطة أولى على زر تشغيل الماسح. بعد التشغيل، القراءة نفسها تكون تلقائية ومستمرة.
+        </div>
+      </div>
+
+      <label for="codeInput">آخر كود تمت قراءته / أو الصقي الكود يدويًا</label>
+      <textarea id="codeInput" placeholder="مثال: (01)06285094000882(21)00000002417305(17)270630(10)F250574"></textarea>
+
+      <div class="buttons">
+        <button id="submitBtn" type="button" onclick="submitCode(false)">حفظ النص الموجود في الشيت</button>
+        <button type="button" class="secondary" onclick="clearForm()">مسح الخانة</button>
+      </div>
+
+      <div id="errorBox" class="error"></div>
+      <div id="successBox" class="success"></div>
+
+      <div id="resultBox" class="result">
+        <h2>آخر قراءة</h2>
+
+        <div class="grid">
+          <div class="item">
+            <div class="key">Product Name</div>
+            <div class="value" id="productName"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Scientific Name</div>
+            <div class="value" id="scientificName"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Lookup Status</div>
+            <div class="value" id="lookupStatus"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Brand</div>
+            <div class="value" id="brand"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">GTIN Original</div>
+            <div class="value" id="gtinOriginal"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">GTIN Search Variant</div>
+            <div class="value" id="gtinSearch"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Serial Number</div>
+            <div class="value" id="serial"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Expiry Year</div>
+            <div class="value" id="expiryYear"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Expiry Month</div>
+            <div class="value" id="expiryMonth"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Expiry Day</div>
+            <div class="value" id="expiryDay"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Expiry Date</div>
+            <div class="value" id="expiryDate"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Batch Number</div>
+            <div class="value" id="batch"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Lookup Source</div>
+            <div class="value" id="source"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Send Status</div>
+            <div class="value" id="sendStatus"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Raw Barcode</div>
+            <div class="value" id="raw"></div>
+          </div>
+
+          <div class="item">
+            <div class="key">Notes</div>
+            <div class="value" id="note"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz3wrv-kta8xTdC39lhM_b9Ul--6-aQ7Q28cC2VQgbfzQfVj6R4fu5vXQzuVgAaZg2x/exec";
+
+    let codeReader = null;
+    let isScanning = false;
+    let lastScannedText = "";
+    let lastScannedAt = 0;
+    let sending = false;
+
+    const DUPLICATE_BLOCK_MS = 3500;
+
+    function startScanner() {
+      hideError();
+      hideSuccess();
+      setLiveStatus("جاري تشغيل الكاميرا...");
+
+      if (!window.ZXing) {
+        showError("مكتبة قارئ الباركود لم تُحمّل. تأكدي من الاتصال بالإنترنت ثم أعيدي فتح الصفحة.");
+        return;
+      }
+
+      const cameraFrame = document.getElementById("cameraFrame");
+      cameraFrame.style.display = "block";
+
+      if (codeReader) {
+        try {
+          codeReader.reset();
+        } catch (e) {}
+      }
+
+      codeReader = new ZXing.BrowserMultiFormatReader();
+
+      isScanning = true;
+      document.getElementById("startBtn").disabled = true;
+
+      codeReader
+        .decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              focusMode: "continuous"
+            }
+          },
+          "video",
+          function(result, err) {
+            if (!isScanning) return;
+
+            if (result) {
+              const text = result.getText();
+
+              if (!text) return;
+
+              const now = Date.now();
+
+              if (text === lastScannedText && now - lastScannedAt < DUPLICATE_BLOCK_MS) {
+                setLiveStatus("نفس الباركود مقروء للتو — وجهي الكاميرا للعلبة التالية.");
+                return;
+              }
+
+              lastScannedText = text;
+              lastScannedAt = now;
+
+              document.getElementById("codeInput").value = text;
+
+              try {
+                navigator.vibrate && navigator.vibrate(120);
+              } catch (e) {}
+
+              setLiveStatus("تمت قراءة الباركود. جاري البحث والحفظ...");
+
+              submitCode(true);
+            }
+          }
+        )
+        .then(function() {
+          setLiveStatus("الماسح يعمل الآن تلقائيًا. وجهي الباركود داخل المربع.");
+        })
+        .catch(function(err) {
+          stopScanner();
+
+          let message = "تعذر فتح الكاميرا: " + err;
+
+          if (String(err).includes("NotAllowedError")) {
+            message =
+              "المتصفح منع الكاميرا. افتحي صفحة GitHub Pages كرابط HTTPS مباشر من Chrome/Safari، ثم من إعدادات الموقع اختاري Camera = Allow.";
+          }
+
+          showError(message);
+        });
+    }
+
+    function stopScanner() {
+      isScanning = false;
+
+      if (codeReader) {
+        try {
+          codeReader.reset();
+        } catch (e) {}
+        codeReader = null;
+      }
+
+      document.getElementById("cameraFrame").style.display = "none";
+      document.getElementById("startBtn").disabled = false;
+      setLiveStatus("تم إيقاف الماسح.");
+    }
+
+    function submitCode(fromAutoScan) {
+      const code = document.getElementById("codeInput").value.trim();
+      const btn = document.getElementById("submitBtn");
+
+      hideError();
+      hideSuccess();
+
+      if (!code) {
+        showError("الرجاء إدخال أو تصوير كود الباركود.");
+        return;
+      }
+
+      const parsed = parseGS1Local(code);
+
+      if (!parsed.gtinOriginal) {
+        showError("لم أستطع استخراج GTIN. تأكدي أن الكود يحتوي على (01).");
+        setLiveStatus("الكود انقرأ، لكن لم يتم استخراج GTIN.");
+        return;
+      }
+
+      showLocalParsedData(code, parsed);
+      document.getElementById("sendStatus").textContent = "جاري الإرسال والبحث عن المنتج...";
+      document.getElementById("resultBox").style.display = "block";
+
+      if (sending) {
+        setLiveStatus("فيه إرسال سابق جاري. انتظري ثانية.");
+        return;
+      }
+
+      sending = true;
+      btn.disabled = true;
+      btn.textContent = "جاري الحفظ...";
+
+      sendByJsonp(code, function(res) {
+        sending = false;
+        btn.disabled = false;
+        btn.textContent = "حفظ النص الموجود في الشيت";
+
+        if (!res || !res.ok) {
+          document.getElementById("sendStatus").textContent = "Send failed";
+          showError(res && res.error ? res.error : "فشل الإرسال أو البحث.");
+          setLiveStatus("فشل الإرسال. الماسح ما زال يعمل.");
+          return;
+        }
+
+        renderServerResult(res);
+
+        showSuccess("تم الحفظ. المنتج: " + (res.productName || "Unknown"));
+        setLiveStatus("تم الحفظ. الكاميرا ما زالت شغالة — وجهيها للباركود التالي.");
+
+        if (fromAutoScan) {
+          setTimeout(function() {
+            document.getElementById("codeInput").value = "";
+          }, 800);
+        }
+      });
+    }
+
+    function sendByJsonp(rawBarcode, callback) {
+      const callbackName = "barcodeCallback_" + Date.now();
+
+      window[callbackName] = function(response) {
+        callback(response);
+
+        try {
+          delete window[callbackName];
+        } catch (e) {
+          window[callbackName] = undefined;
+        }
+
+        const oldScript = document.getElementById(callbackName);
+        if (oldScript) oldScript.remove();
+      };
+
+      const script = document.createElement("script");
+      script.id = callbackName;
+
+      const url =
+        SCRIPT_WEB_APP_URL +
+        "?action=scan" +
+        "&callback=" + encodeURIComponent(callbackName) +
+        "&rawBarcode=" + encodeURIComponent(rawBarcode);
+
+      script.src = url;
+
+      script.onerror = function() {
+        callback({
+          ok: false,
+          error: "تعذر الاتصال بـ Apps Script. تأكدي أن رابط /exec منشور كـ Anyone with the link."
+        });
+
+        try {
+          delete window[callbackName];
+        } catch (e) {
+          window[callbackName] = undefined;
+        }
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function showLocalParsedData(rawBarcode, parsed) {
+      document.getElementById("productName").textContent = "Searching...";
+      document.getElementById("scientificName").textContent = "";
+      document.getElementById("lookupStatus").textContent = "Searching...";
+      document.getElementById("brand").textContent = "";
+      document.getElementById("gtinOriginal").textContent = parsed.gtinOriginal || "";
+      document.getElementById("gtinSearch").textContent = parsed.gtinSearch || "";
+      document.getElementById("serial").textContent = parsed.serial || "";
+      document.getElementById("expiryYear").textContent = parsed.expiryYear || "";
+      document.getElementById("expiryMonth").textContent = parsed.expiryMonth || "";
+      document.getElementById("expiryDay").textContent = parsed.expiryDay || "";
+      document.getElementById("expiryDate").textContent = parsed.expiryDate || "";
+      document.getElementById("batch").textContent = parsed.batch || "";
+      document.getElementById("source").textContent = "";
+      document.getElementById("raw").textContent = rawBarcode || "";
+      document.getElementById("note").textContent = "";
+    }
+
+    function renderServerResult(res) {
+      document.getElementById("productName").textContent = res.productName || "Unknown";
+      document.getElementById("scientificName").textContent = res.scientificName || "";
+      document.getElementById("lookupStatus").textContent = res.status || "";
+      document.getElementById("brand").textContent = res.brand || "";
+      document.getElementById("gtinOriginal").textContent = res.gtinOriginal || "";
+      document.getElementById("gtinSearch").textContent = res.gtinSearch || "";
+      document.getElementById("serial").textContent = res.serial || "";
+      document.getElementById("expiryYear").textContent = res.expiryYear || "";
+      document.getElementById("expiryMonth").textContent = res.expiryMonth || "";
+      document.getElementById("expiryDay").textContent = res.expiryDay || "";
+      document.getElementById("expiryDate").textContent = res.expiryDate || "";
+      document.getElementById("batch").textContent = res.batch || "";
+      document.getElementById("source").textContent = res.source || "";
+      document.getElementById("sendStatus").textContent =
+        (res.status || "Saved") + " | " + (res.productName || "Unknown");
+      document.getElementById("note").textContent = res.note || "";
+      document.getElementById("resultBox").style.display = "block";
+    }
+
+    function parseGS1Local(input) {
+      const text = String(input || "").trim();
+
+      const result = {};
+      const regex = /\((\d{2,4})\)([^\(]+)/g;
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        result[match[1]] = String(match[2]).trim();
+      }
+
+      if (Object.keys(result).length === 0) {
+        const compact = text.replace(/\u001d/g, "").replace(/\s/g, "");
+
+        const idx01 = compact.indexOf("01");
+
+        if (idx01 >= 0 && compact.length >= idx01 + 16) {
+          result["01"] = compact.substring(idx01 + 2, idx01 + 16);
+        }
+
+        const idx17 = compact.indexOf("17", idx01 + 16);
+
+        if (idx17 >= 0) {
+          result["17"] = compact.substring(idx17 + 2, idx17 + 8);
+        }
+
+        const idx21 = compact.indexOf("21", idx01 + 16);
+
+        if (idx21 >= 0) {
+          const end21 = idx17 > idx21 ? idx17 : compact.length;
+          result["21"] = compact.substring(idx21 + 2, end21);
+        }
+
+        const idx10 = compact.indexOf("10", idx17 >= 0 ? idx17 + 8 : 0);
+
+        if (idx10 >= 0) {
+          result["10"] = compact.substring(idx10 + 2);
+        }
+      }
+
+      const gtinOriginal = result["01"] || "";
+      const expiryParts = formatExpiryPartsLocal(result["17"] || "");
+
+      return {
+        gtinOriginal: gtinOriginal,
+        gtinSearch: normalizeGtinLocal(gtinOriginal),
+        serial: result["21"] || "",
+        expiryYear: expiryParts.year,
+        expiryMonth: expiryParts.month,
+        expiryDay: expiryParts.day,
+        expiryDate: expiryParts.fullDate,
+        batch: result["10"] || ""
+      };
+    }
+
+    function normalizeGtinLocal(gtin) {
+      const clean = String(gtin || "").replace(/\D/g, "");
+
+      if (clean.length === 14 && clean.startsWith("0")) {
+        return clean.substring(1);
+      }
+
+      return clean;
+    }
+
+    function formatExpiryPartsLocal(yyMMdd) {
+      if (!yyMMdd || String(yyMMdd).length !== 6) {
+        return {
+          year: "",
+          month: "",
+          day: "",
+          fullDate: ""
+        };
+      }
+
+      const s = String(yyMMdd);
+      const yy = Number(s.substring(0, 2));
+      const yyyy = yy >= 50 ? 1900 + yy : 2000 + yy;
+      const month = s.substring(2, 4);
+      const day = s.substring(4, 6);
+
+      return {
+        year: yyyy,
+        month: month,
+        day: day,
+        fullDate: yyyy + "-" + month + "-" + day
+      };
+    }
+
+    function clearForm() {
+      document.getElementById("codeInput").value = "";
+      hideError();
+      hideSuccess();
+      hideResult();
+      setLiveStatus("تم مسح الخانة. الماسح يستمر إذا كانت الكاميرا مفتوحة.");
+    }
+
+    function setLiveStatus(message) {
+      const box = document.getElementById("liveStatus");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function showError(message) {
+      const box = document.getElementById("errorBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    function showSuccess(message) {
+      const box = document.getElementById("successBox");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideSuccess() {
+      document.getElementById("successBox").style.display = "none";
+    }
+
+    function hideResult() {
+      document.getElementById("resultBox").style.display = "none";
+    }
+  </script>
+</body>
+</html>
