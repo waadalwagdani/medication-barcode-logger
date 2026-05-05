@@ -37,25 +37,11 @@
       color: #0f2f4a;
     }
 
-    h2 {
-      margin: 0 0 12px;
-      font-size: 18px;
-      color: #0f2f4a;
-    }
-
     .subtitle {
       margin: 0 0 22px;
       color: #667085;
       font-size: 14px;
       line-height: 1.7;
-    }
-
-    .setup-box {
-      background: #fffaf0;
-      border: 1px solid #f5d08a;
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 18px;
     }
 
     .scanner-box {
@@ -82,7 +68,6 @@
       color: #344054;
     }
 
-    input,
     textarea {
       width: 100%;
       box-sizing: border-box;
@@ -92,21 +77,12 @@
       font-size: 15px;
       outline: none;
       background: white;
-    }
-
-    input {
-      direction: ltr;
-      text-align: left;
-    }
-
-    textarea {
       min-height: 110px;
       resize: vertical;
       direction: ltr;
       text-align: left;
     }
 
-    input:focus,
     textarea:focus {
       border-color: #0f6372;
       box-shadow: 0 0 0 4px rgba(15, 99, 114, 0.12);
@@ -140,10 +116,6 @@
       color: #172033;
     }
 
-    button.danger {
-      background: #9b1c1c;
-    }
-
     button:disabled {
       opacity: 0.55;
       cursor: not-allowed;
@@ -154,27 +126,6 @@
       color: #667085;
       line-height: 1.7;
       margin-top: 10px;
-    }
-
-    .status-pill {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #e8eef2;
-      color: #172033;
-      font-size: 12px;
-      font-weight: 700;
-      margin-top: 8px;
-    }
-
-    .status-pill.ok {
-      background: #e8f7ef;
-      color: #137a3f;
-    }
-
-    .status-pill.bad {
-      background: #fff1f1;
-      color: #9b1c1c;
     }
 
     .result {
@@ -259,26 +210,10 @@
   <div class="page">
     <div class="card">
       <h1>Medication Barcode Logger</h1>
+
       <p class="subtitle">
         صوري باركود الدواء أو الصقي النص الناتج منه. الأداة تفك GTIN وSerial وExpiry وBatch، ثم ترسل البيانات تلقائيًا إلى Google Sheet.
       </p>
-
-      <div id="setupBox" class="setup-box">
-        <h2>إعداد الرابط</h2>
-        <div class="hint">
-          الصقي رابط Google Apps Script Web App الذي ينتهي بـ /exec. هذا يتم مرة واحدة فقط على نفس الجهاز.
-        </div>
-
-        <label for="scriptUrlInput">Apps Script /exec URL</label>
-        <input id="scriptUrlInput" placeholder="https://script.google.com/macros/s/...../exec" />
-
-        <div class="buttons">
-          <button type="button" onclick="saveScriptUrl()">حفظ الرابط</button>
-          <button type="button" class="danger" onclick="clearScriptUrl()">مسح الرابط</button>
-        </div>
-
-        <div id="urlStatus" class="status-pill">لم يتم حفظ الرابط بعد</div>
-      </div>
 
       <div class="scanner-box">
         <video id="video" playsinline muted></video>
@@ -343,76 +278,14 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "medicationBarcodeLoggerScriptUrl";
+    const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyg6KwxpRs8qo21BetIq_PGOHm2qWBTg92hdQE16FqSw6L21z2uhqzUxK5YyYf_C82Utg/exec";
 
     let codeReader = null;
     let isScanning = false;
 
-    window.addEventListener("load", function() {
-      loadScriptUrl();
-    });
-
-    function loadScriptUrl() {
-      const savedUrl = localStorage.getItem(STORAGE_KEY) || "";
-      document.getElementById("scriptUrlInput").value = savedUrl;
-      updateUrlStatus();
-    }
-
-    function getScriptUrl() {
-      return (localStorage.getItem(STORAGE_KEY) || "").trim();
-    }
-
-    function saveScriptUrl() {
-      hideError();
-      hideSuccess();
-
-      const input = document.getElementById("scriptUrlInput").value.trim();
-
-      if (!input) {
-        showError("الصقي رابط Apps Script أولاً.");
-        return;
-      }
-
-      if (!input.startsWith("https://script.google.com/macros/s/") || !input.endsWith("/exec")) {
-        showError("الرابط غير صحيح. لازم يبدأ بـ https://script.google.com/macros/s/ وينتهي بـ /exec");
-        return;
-      }
-
-      localStorage.setItem(STORAGE_KEY, input);
-      updateUrlStatus();
-      showSuccess("تم حفظ رابط الشيت على هذا الجهاز.");
-    }
-
-    function clearScriptUrl() {
-      localStorage.removeItem(STORAGE_KEY);
-      document.getElementById("scriptUrlInput").value = "";
-      updateUrlStatus();
-      showSuccess("تم مسح الرابط المحفوظ.");
-    }
-
-    function updateUrlStatus() {
-      const status = document.getElementById("urlStatus");
-      const savedUrl = getScriptUrl();
-
-      if (savedUrl) {
-        status.textContent = "الرابط محفوظ وجاهز";
-        status.className = "status-pill ok";
-      } else {
-        status.textContent = "لم يتم حفظ الرابط بعد";
-        status.className = "status-pill bad";
-      }
-    }
-
     function startScanner() {
       hideError();
       hideSuccess();
-
-      const scriptUrl = getScriptUrl();
-
-      if (!scriptUrl) {
-        showError("احفظي رابط Apps Script /exec أولاً، ثم افتحي الكاميرا.");
-        return;
-      }
 
       const video = document.getElementById("video");
       video.style.display = "block";
@@ -473,18 +346,12 @@
     }
 
     function submitCode() {
-      const scriptUrl = getScriptUrl();
       const code = document.getElementById("codeInput").value.trim();
       const btn = document.getElementById("submitBtn");
 
       hideError();
       hideSuccess();
       hideResult();
-
-      if (!scriptUrl) {
-        showError("احفظي رابط Apps Script /exec أولاً.");
-        return;
-      }
 
       if (!code) {
         showError("الرجاء إدخال أو تصوير كود الباركود.");
@@ -513,7 +380,7 @@
       const formData = new FormData();
       formData.append("rawBarcode", code);
 
-      fetch(scriptUrl, {
+      fetch(SCRIPT_WEB_APP_URL, {
         method: "POST",
         mode: "no-cors",
         body: formData
